@@ -45,12 +45,15 @@ def main():
         return
         
     trade_amount_usdt = config.get("TRADE_AMOUNT_USDT", 10.0)
-    interval = config.get("CHECK_INTERVAL_SECONDS", 10)
+    interval = config.get("CHECK_INTERVAL_SECONDS", 30)
     
     # 1. API 클라이언트, 전략, 텔레그램 초기화
     api = BinanceClient()
     strategy = CustomLogicV1(api)
     notifier = TelegramNotifier()
+    
+    # 시작 알림
+    notifier.send_message("<b>[봇 시작]</b>\n바이낸스 자동매매 봇이 가동되었습니다. 🚀")
     
     # 기존 보유 코인 보호 모드
     ignored_tickers = get_ignored_tickers(api)
@@ -115,6 +118,7 @@ def main():
             time.sleep(1)
     except KeyboardInterrupt:
         logger.info("=== 🛑 봇 실행을 종료합니다 ===")
+        notifier.send_message("<b>[봇 종료]</b>\n사용자에 의해 봇 가동이 중단되었습니다. 🛑")
 
 if __name__ == "__main__":
     main()
