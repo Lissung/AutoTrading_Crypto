@@ -1,0 +1,15 @@
+# Environments
+venv/
+env/
+__pycache__/
+
+# Configuration & Secrets
+config.json
+ignored_tickers.json
+
+# Logs
+logs/
+*.log
+
+# macOS
+.DS_Store
