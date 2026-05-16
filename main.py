@@ -55,11 +55,13 @@ def main():
     # 기존 보유 코인 보호 모드
     ignored_tickers = get_ignored_tickers(api)
     
-    # 2. 거래할 코인 목록 가져오기 (USDT 마켓 상위 코인 테스트)
-    tickers = ["BTC/USDT", "ETH/USDT", "XRP/USDT", "SOL/USDT", "DOGE/USDT"]
-    logger.info(f"👀 감시 대상 코인: {tickers}")
+    # 2. 거래 시작
     
     def trade_job():
+        # 매 주기마다 거래량 상위 50개 종목을 새로 가져옵니다.
+        tickers = api.get_top_volume_tickers(limit=50)
+        logger.info(f"👀 현재 감시 중인 상위 거래량 종목(50개): {tickers[:5]}... 등")
+        
         for ticker in tickers:
             if ticker in ignored_tickers:
                 continue # 이미 수동으로 사둔 코인은 감시 제외

@@ -107,3 +107,28 @@ class BinanceClient:
         except Exception as e:
             logger.error(f"Error fetching avg buy price for {ticker}: {e}")
             return 0
+
+    def get_top_volume_tickers(self, limit=50):
+        """24시간 거래량 상위 USDT 마켓 리스트를 가져옵니다."""
+        try:
+            # 전체 티커 정보 한 번에 가져오기
+            tickers = self.binance.fetch_tickers()
+            
+            # USDT 마켓만 필터링 (예: BTC/USDT)
+            usdt_tickers = []
+            for symbol, data in tickers.items():
+                if '/USDT' in symbol and data['quoteVolume'] is not None:
+                    # 스테이블 코인 제외 필터 (옵션)
+                    base = symbol.split('/')[0]
+                    if base in ['USDC', 'BUSD', 'TUSD', 'PAX', 'DAI', 'EUR', 'GBP']:
+                        continue
+                    usdt_tickers.append(data)
+            
+            # 거래량(quoteVolume) 기준 내림차순 정렬
+            sorted_tickers = sorted(usdt_tickers, key=lambda x: x['quoteVolume'], reverse=True)
+            
+            # 상위 N개 심볼만 반환
+            return [t['symbol'] for t in sorted_tickers[:limit]]
+        except Exception as e:
+            logger.error(f"Error fetching top volume tickers: {e}")
+            return ["BTC/USDT", "ETH/USDT", "XRP/USDT", "SOL/USDT", "DOGE/USDT"] # 실패 시 기본값
