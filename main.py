@@ -84,10 +84,23 @@ def main():
                 
                 if balance_usdt_value > 5.0: # 보유 가치가 5 USDT 이상이면
                     if strategy.check_sell_condition(ticker):
+                        avg_buy_price = api.get_avg_buy_price(ticker)
+                        sell_price = current_price if current_price else api.get_current_price(ticker)
+                        profit_rate = 0.0
+                        if avg_buy_price > 0 and sell_price:
+                            profit_rate = (sell_price - avg_buy_price) / avg_buy_price * 100
+                            
                         order = api.sell_market_order(ticker, balance)
                         if order:
-                            logger.info(f"✅ {ticker} 전량 매도 완료")
-                            notifier.send_message(f"🚨 <b>매도 완료</b>\n- 코인: {ticker}\n- 수량: {balance:.4f}")
+                            logger.info(f"✅ {ticker} 전량 매도 완료 (수익률: {profit_rate:+.2f}%)")
+                            notifier.send_message(
+                                f"🚨 <b>매도 완료</b>\n"
+                                f"- 코인: {ticker}\n"
+                                f"- 수량: {balance:.4f}\n"
+                                f"- 매수가: {avg_buy_price:.6f}\n"
+                                f"- 매도가: {sell_price:.6f}\n"
+                                f"- <b>수익률: {profit_rate:+.2f}%</b>"
+                            )
                     continue # 보유 중일 때는 매수 조건 검사를 건너뜀
                     
                 # 2. 매수 조건 검사 (보유 중이 아닌 경우)
