@@ -84,21 +84,32 @@ def main():
                 
                 if balance_usdt_value > 5.0: # 보유 가치가 5 USDT 이상이면
                     if strategy.check_sell_condition(ticker):
-                        avg_buy_price = api.get_avg_buy_price(ticker)
+                        avg_buy_price, buy_timestamp = api.get_last_buy_info(ticker)
                         sell_price = current_price if current_price else api.get_current_price(ticker)
                         profit_rate = 0.0
                         if avg_buy_price > 0 and sell_price:
                             profit_rate = (sell_price - avg_buy_price) / avg_buy_price * 100
                             
+                        # 경과 시간 및 강제 매도 여부 계산
+                        elapsed_hours = 0.0
+                        is_force_sell = False
+                        if buy_timestamp > 0:
+                            elapsed_seconds = (time.time() * 1000 - buy_timestamp) / 1000
+                            elapsed_hours = elapsed_seconds / 3600
+                            if elapsed_seconds >= 86400:
+                                is_force_sell = True
+                                
                         order = api.sell_market_order(ticker, balance)
                         if order:
-                            logger.info(f"✅ {ticker} 전량 매도 완료 (수익률: {profit_rate:+.2f}%)")
+                            reason = "⏳ 24시간 초과 강제 매도" if is_force_sell else "🎯 조건 달성 매도"
+                            logger.info(f"✅ {ticker} 전량 매도 완료 (수익률: {profit_rate:+.2f}%, 사유: {reason})")
                             notifier.send_message(
-                                f"🚨 <b>매도 완료</b>\n"
+                                f"🚨 <b>매도 완료 ({reason})</b>\n"
                                 f"- 코인: {ticker}\n"
                                 f"- 수량: {balance:.4f}\n"
                                 f"- 매수가: {avg_buy_price:.6f}\n"
                                 f"- 매도가: {sell_price:.6f}\n"
+                                f"- 경과 시간: {elapsed_hours:.1f}시간\n"
                                 f"- <b>수익률: {profit_rate:+.2f}%</b>"
                             )
                     continue # 보유 중일 때는 매수 조건 검사를 건너뜀

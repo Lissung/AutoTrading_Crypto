@@ -108,6 +108,20 @@ class BinanceClient:
             logger.error(f"Error fetching avg buy price for {ticker}: {e}")
             return 0
 
+    def get_last_buy_info(self, ticker):
+        """가장 최근에 체결된 해당 티커의 매수 가격과 시간(timestamp)을 조회합니다."""
+        if not self.binance or not self.binance.apiKey:
+            return 0, 0
+        try:
+            trades = self.binance.fetch_my_trades(ticker, limit=10)
+            for trade in reversed(trades): # 최신 거래부터 거꾸로 확인
+                if trade['side'] == 'buy':
+                    return float(trade['price']), int(trade['timestamp'])
+            return 0, 0
+        except Exception as e:
+            logger.error(f"Error fetching last buy info for {ticker}: {e}")
+            return 0, 0
+
     def get_top_volume_tickers(self, limit=50):
         """24시간 거래량 상위 USDT 마켓 리스트를 가져옵니다."""
         try:

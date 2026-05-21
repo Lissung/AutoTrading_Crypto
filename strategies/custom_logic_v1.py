@@ -38,8 +38,8 @@ class CustomLogicV1(BaseStrategy):
 
     def check_sell_condition(self, ticker) -> bool:
         try:
-            avg_buy_price = self.api.get_avg_buy_price(ticker)
-            if avg_buy_price <= 0:
+            avg_buy_price, buy_timestamp = self.api.get_last_buy_info(ticker)
+            if avg_buy_price <= 0 or buy_timestamp <= 0:
                 return False
                 
             current_price = self.api.get_current_price(ticker)
@@ -49,12 +49,21 @@ class CustomLogicV1(BaseStrategy):
             # 수익률 계산
             profit_rate = (current_price - avg_buy_price) / avg_buy_price * 100
             
-            # 10% 이상 익절 또는 10% 이상 손절
+            # 시간 경과 계산 (time.time()은 초 단위, buy_timestamp는 밀리초 단위)
+            elapsed_seconds = (time.time() * 1000 - buy_timestamp) / 1000
+            elapsed_hours = elapsed_seconds / 3600
+            
+            # 1. 10% 이상 익절 또는 10% 이상 손절
             if profit_rate >= 10.0:
                 logger.info(f"✨ [익절 조건 달성] {ticker} | 수익률: +{profit_rate:.2f}% (매수가: {avg_buy_price}, 현재가: {current_price})")
                 return True
             elif profit_rate <= -10.0:
                 logger.info(f"💧 [손절 조건 달성] {ticker} | 손실률: {profit_rate:.2f}% (매수가: {avg_buy_price}, 현재가: {current_price})")
+                return True
+                
+            # 2. 24시간 동안 매도되지 않은 경우 강제 매도 (24시간 = 86400초)
+            if elapsed_seconds >= 86400:
+                logger.info(f"⏳ [24시간 시간초과 강제 매도] {ticker} | 경과 시간: {elapsed_hours:.1f}시간 | 수익률: {profit_rate:+.2f}%")
                 return True
                 
             return False
