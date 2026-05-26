@@ -78,8 +78,12 @@ class BinanceClient:
             # 주문 수량 = 달러 / 현재가
             amount = amount_usdt / current_price
             
-            logger.info(f"🚀 [매수 주문] 종목: {ticker}, {amount_usdt} USDT (약 {amount:.4f}개)")
-            return self.binance.create_market_buy_order(ticker, amount)
+            # 거래소 마켓 정보 로드 및 수량 정밀도 절사
+            self.binance.load_markets()
+            precise_amount = float(self.binance.amount_to_precision(ticker, amount))
+            
+            logger.info(f"🚀 [매수 주문] 종목: {ticker}, {amount_usdt} USDT (약 {precise_amount:.6f}개)")
+            return self.binance.create_market_buy_order(ticker, precise_amount)
         except Exception as e:
             logger.error(f"Buy error {ticker}: {e}")
             return None
@@ -88,8 +92,16 @@ class BinanceClient:
         if not self.binance or not self.binance.apiKey:
             return None
         try:
-            logger.info(f"📉 [매도 주문] 종목: {ticker}, 수량: {volume}")
-            return self.binance.create_market_sell_order(ticker, volume)
+            # 거래소 마켓 정보 로드 및 수량 정밀도 절사
+            self.binance.load_markets()
+            precise_volume = float(self.binance.amount_to_precision(ticker, volume))
+            
+            if precise_volume <= 0:
+                logger.warning(f"⚠️ 정밀도 절사 후 매도 수량이 0 이하입니다. ({volume} -> {precise_volume})")
+                return None
+                
+            logger.info(f"📉 [매도 주문] 종목: {ticker}, 수량: {precise_volume} (원본 잔고: {volume})")
+            return self.binance.create_market_sell_order(ticker, precise_volume)
         except Exception as e:
             logger.error(f"Sell error {ticker}: {e}")
             return None
@@ -121,6 +133,34 @@ class BinanceClient:
         except Exception as e:
             logger.error(f"Error fetching last buy info for {ticker}: {e}")
             return 0, 0
+
+    def convert_dust_to_bnb(self, base_currency):
+        """매도 후 남은 소액 잔돈(dust)을 BNB로 전환합니다."""
+        if not self.binance or not self.binance.apiKey:
+            return None
+        try:
+            # 먼저 현재 잔고 조회
+            balance = self.get_balance(base_currency)
+            if balance <= 0:
+                return None
+                
+            # 너무 큰 금액을 실수로 전환하는 것을 방지하기 위해 잔고 가치를 체크합니다.
+            # 1.5 USDT 미만의 가치만 먼지 전환 대상으로 삼습니다.
+            current_price = self.get_current_price(f"{base_currency}/USDT")
+            if current_price:
+                value_usdt = balance * current_price
+                if value_usdt > 1.5:  # 1.5 USDT 초과 보유 중이면 Dust 전환 대상이 아님
+                    logger.info(f"ℹ️ {base_currency} 잔고 가치가 {value_usdt:.2f} USDT로, 먼지 전환 기준(1.5 USDT)을 초과하므로 스킵합니다.")
+                    return None
+            
+            logger.info(f"🧹 [잔돈 청소] {base_currency} 잔고 {balance}개를 BNB로 일괄 전환 시도...")
+            # 바이낸스 Dust 전환 API 호출 (privatePostAssetDust)
+            response = self.binance.privatePostAssetDust({'asset': [base_currency]})
+            logger.info(f"✅ {base_currency} 잔돈 BNB 전환 성공: {response}")
+            return response
+        except Exception as e:
+            logger.error(f"Error converting dust to BNB for {base_currency}: {e}")
+            return None
 
     def get_top_volume_tickers(self, limit=50):
         """24시간 거래량 상위 USDT 마켓 리스트를 가져옵니다."""

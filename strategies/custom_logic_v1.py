@@ -6,7 +6,7 @@ class CustomLogicV1(BaseStrategy):
     """
     급등주 포착 전략 V1 (바이낸스 버전)
     - 매수 조건: 3분 전 대비 2% 이상 상승 AND 5분 전 대비 5% 이상 상승
-    - 매도 조건: 매수가 대비 10% 이상 상승 시 익절 OR 10% 이상 하락 시 손절
+    - 매도 조건: 매수가 대비 10% 이상 상승 시 익절 OR 5% 이상 하락 시 손절
     """
     def __init__(self, api_client):
         super().__init__(api_client)
@@ -57,7 +57,7 @@ class CustomLogicV1(BaseStrategy):
             if profit_rate >= 10.0:
                 logger.info(f"✨ [익절 조건 달성] {ticker} | 수익률: +{profit_rate:.2f}% (매수가: {avg_buy_price}, 현재가: {current_price})")
                 return True
-            elif profit_rate <= -10.0:
+            elif profit_rate <= -5.0:
                 logger.info(f"💧 [손절 조건 달성] {ticker} | 손실률: {profit_rate:.2f}% (매수가: {avg_buy_price}, 현재가: {current_price})")
                 return True
                 

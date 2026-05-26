@@ -103,6 +103,14 @@ def main():
                         if order:
                             reason = "⏳ 24시간 초과 강제 매도" if is_force_sell else "🎯 조건 달성 매도"
                             logger.info(f"✅ {ticker} 전량 매도 완료 (수익률: {profit_rate:+.2f}%, 사유: {reason})")
+                            
+                            # 매도 완료 직후 지갑에 남는 미세 잔돈(Dust) BNB 전환 시도 (1초 대기 후 진행)
+                            time.sleep(1.0)
+                            dust_res = api.convert_dust_to_bnb(base_currency)
+                            dust_msg = ""
+                            if dust_res:
+                                dust_msg = "\n🧹 <b>잔돈 청소</b>: 미세 소수점 잔돈을 BNB로 일괄 전환했습니다."
+                            
                             notifier.send_message(
                                 f"🚨 <b>매도 완료 ({reason})</b>\n"
                                 f"- 코인: {ticker}\n"
@@ -111,6 +119,7 @@ def main():
                                 f"- 매도가: {sell_price:.6f}\n"
                                 f"- 경과 시간: {elapsed_hours:.1f}시간\n"
                                 f"- <b>수익률: {profit_rate:+.2f}%</b>"
+                                f"{dust_msg}"
                             )
                     continue # 보유 중일 때는 매수 조건 검사를 건너뜀
                     
