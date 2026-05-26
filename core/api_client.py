@@ -154,8 +154,8 @@ class BinanceClient:
                     return None
             
             logger.info(f"🧹 [잔돈 청소] {base_currency} 잔고 {balance}개를 BNB로 일괄 전환 시도...")
-            # 바이낸스 Dust 전환 API 호출 (privatePostAssetDust)
-            response = self.binance.privatePostAssetDust({'asset': [base_currency]})
+            # 바이낸스 Dust 전환 API 호출 (sapiPostAssetDust)
+            response = self.binance.sapiPostAssetDust({'asset': [base_currency]})
             logger.info(f"✅ {base_currency} 잔돈 BNB 전환 성공: {response}")
             return response
         except Exception as e:
