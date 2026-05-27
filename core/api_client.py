@@ -67,23 +67,25 @@ class BinanceClient:
             return {}
 
     def buy_market_order(self, ticker, amount_usdt):
+        """USDT 금액으로 시장가 매수 (quoteOrderQty 방식 - USDT 마켓 전용)"""
         if not self.binance or not self.binance.apiKey:
             return None
+        
+        # USDT 마켓인지 강제 검증
+        if not ticker.endswith('/USDT'):
+            logger.error(f"❌ [매수 거부] {ticker}는 USDT 마켓이 아닙니다. USDT 페어만 거래 가능합니다.")
+            return None
+        
         try:
-            # 바이낸스 시장가 매수는 달러(USDT) 대신 코인 수량(Amount)을 요구합니다.
-            current_price = self.get_current_price(ticker)
-            if not current_price:
-                return None
-            
-            # 주문 수량 = 달러 / 현재가
-            amount = amount_usdt / current_price
-            
-            # 거래소 마켓 정보 로드 및 수량 정밀도 절사
+            # quoteOrderQty 방식: USDT 금액으로 직접 매수 (바이낸스가 수량 자동 계산)
+            # 이 방식은 소수점 정밀도 문제 없이 정확한 USDT 금액만큼 매수합니다.
             self.binance.load_markets()
-            precise_amount = float(self.binance.amount_to_precision(ticker, amount))
-            
-            logger.info(f"🚀 [매수 주문] 종목: {ticker}, {amount_usdt} USDT (약 {precise_amount:.6f}개)")
-            return self.binance.create_market_buy_order(ticker, precise_amount)
+            logger.info(f"🚀 [매수 주문] 종목: {ticker}, 금액: {amount_usdt} USDT (quoteOrderQty 방식)")
+            return self.binance.create_market_buy_order(
+                ticker,
+                amount=None,  # 수량 대신 금액으로 지정
+                params={'quoteOrderQty': amount_usdt}  # USDT 금액으로 직접 매수
+            )
         except Exception as e:
             logger.error(f"Buy error {ticker}: {e}")
             return None
@@ -163,26 +165,32 @@ class BinanceClient:
             return None
 
     def get_top_volume_tickers(self, limit=50):
-        """24시간 거래량 상위 USDT 마켓 리스트를 가져옵니다."""
+        """24시간 거래량 상위 USDT 마켓 리스트를 가져옵니다. (USDT 페어 전용)"""
         try:
             # 전체 티커 정보 한 번에 가져오기
             tickers = self.binance.fetch_tickers()
             
-            # USDT 마켓만 필터링 (예: BTC/USDT)
+            # USDT 마켓만 엄격하게 필터링 (심볼이 정확히 'XXX/USDT' 형태여야 함)
             usdt_tickers = []
             for symbol, data in tickers.items():
-                if '/USDT' in symbol and data['quoteVolume'] is not None:
-                    # 스테이블 코인 제외 필터 (옵션)
-                    base = symbol.split('/')[0]
-                    if base in ['USDC', 'BUSD', 'TUSD', 'PAX', 'DAI', 'EUR', 'GBP']:
-                        continue
-                    usdt_tickers.append(data)
+                # 반드시 /USDT로 끝나는 심볼만 허용 (예: BTC/USDT는 OK, BTC/USDT:USDT 같은 선물은 제외)
+                if not symbol.endswith('/USDT'):
+                    continue
+                if data['quoteVolume'] is None:
+                    continue
+                # 스테이블코인 및 법정화폐 토큰 제외
+                base = symbol.split('/')[0]
+                if base in ['USDC', 'BUSD', 'TUSD', 'PAX', 'DAI', 'EUR', 'GBP', 'FDUSD', 'USDP', 'USDS']:
+                    continue
+                usdt_tickers.append(data)
             
             # 거래량(quoteVolume) 기준 내림차순 정렬
             sorted_tickers = sorted(usdt_tickers, key=lambda x: x['quoteVolume'], reverse=True)
             
-            # 상위 N개 심볼만 반환
-            return [t['symbol'] for t in sorted_tickers[:limit]]
+            # 상위 N개 심볼만 반환 (모두 /USDT 마켓 보장)
+            result = [t['symbol'] for t in sorted_tickers[:limit]]
+            logger.info(f"✅ USDT 마켓 전용 상위 {len(result)}개 종목 조회 완료")
+            return result
         except Exception as e:
             logger.error(f"Error fetching top volume tickers: {e}")
-            return ["BTC/USDT", "ETH/USDT", "XRP/USDT", "SOL/USDT", "DOGE/USDT"] # 실패 시 기본값
+            return ["BTC/USDT", "ETH/USDT", "XRP/USDT", "SOL/USDT", "DOGE/USDT"] # 실패 시 기본값 (모두 USDT 페어)

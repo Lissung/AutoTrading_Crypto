@@ -69,6 +69,11 @@ def main():
             if ticker in ignored_tickers:
                 continue # 이미 수동으로 사둔 코인은 감시 제외
                 
+            # USDT 마켓 전용: 혹시라도 /USDT가 아닌 심볼이 들어오면 스킵
+            if not ticker.endswith('/USDT'):
+                logger.warning(f"⚠️ [{ticker}] USDT 마켓이 아니므로 스킵합니다.")
+                continue
+                
             try:
                 # Base currency 추출 (예: BTC/USDT -> BTC)
                 base_currency = ticker.split('/')[0]
