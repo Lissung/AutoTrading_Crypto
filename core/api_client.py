@@ -164,6 +164,44 @@ class BinanceClient:
             logger.error(f"Error converting dust to BNB for {base_currency}: {e}")
             return None
 
+    def sell_bnb_to_usdt_if_possible(self):
+        """BNB 잔고가 최소 매도 금액 이상이 되면 USDT로 매도하여 현금화합니다."""
+        if not self.binance or not self.binance.apiKey:
+            return None
+        try:
+            # BNB 잔고 조회
+            bnb_balance = self.get_balance("BNB")
+            if bnb_balance <= 0:
+                return None
+                
+            # BNB 현재 가격 조회
+            bnb_price = self.get_current_price("BNB/USDT")
+            if not bnb_price:
+                return None
+                
+            bnb_value_usdt = bnb_balance * bnb_price
+            
+            # 최소 주문 금액 확인 (ccxt 마켓 정보에서 가져오거나 기본 10.0 USDT 사용)
+            self.binance.load_markets()
+            min_cost = 10.0
+            if "BNB/USDT" in self.binance.markets:
+                market = self.binance.market("BNB/USDT")
+                if 'limits' in market and 'cost' in market['limits'] and 'min' in market['limits']['cost']:
+                    min_cost = float(market['limits']['cost']['min'])
+            
+            # 안전하게 최소 금액 + 0.1 USDT 마진을 둡니다.
+            if bnb_value_usdt >= (min_cost + 0.1):
+                logger.info(f"🪙 [BNB 현금화 시도] BNB 잔고가 {bnb_balance:.4f} BNB (약 {bnb_value_usdt:.2f} USDT)로 최소 매도 제한({min_cost} USDT)을 초과했습니다.")
+                # 전량 시장가 매도
+                order = self.sell_market_order("BNB/USDT", bnb_balance)
+                if order:
+                    logger.info(f"✅ BNB 현금화 완료! 약 {bnb_value_usdt:.2f} USDT가 지갑으로 환원되었습니다.")
+                    return bnb_value_usdt
+            return None
+        except Exception as e:
+            logger.error(f"Error checking/selling BNB: {e}")
+            return None
+
     def get_top_volume_tickers(self, limit=50):
         """24시간 거래량 상위 USDT 마켓 리스트를 가져옵니다. (USDT 페어 전용)"""
         try:

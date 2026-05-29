@@ -13,3 +13,4 @@ logs/
 
 # macOS
 .DS_Store
+.bot.pid
